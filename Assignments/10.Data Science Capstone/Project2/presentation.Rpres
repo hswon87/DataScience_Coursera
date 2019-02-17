@@ -1,0 +1,54 @@
+Coursera Data Science Capstone: Final Project
+========================================================
+author: Sangwon Han
+date: `r date()`
+autosize: true
+
+
+Predicting the Following Word
+
+
+Overview
+========================================================
+
+<span style = "font-weight:bold; color:blue">
+This project is to build an algorithm for predicting next word. This auto-completion is a commonly adopted in websites.
+
+
+This presentation is a part of the requirement for the Data Science Capstone Course, a 10th course in Data Science, Coursera.
+
+
+Getting and Cleaning data
+========================================================
+
+<span style="font-weight:bold; color:blue">The first step of building prediction model is getting and cleaning data
+
+- Subsets extracted from the three dataset (blogs, twitter, and news) is merged into one.
+- The raw text is transformed into the corpus which is more suitable for automated manipulation.
+- Data cleaning is done using "tm" Packages which includes removing numbers, stopwords, converting to lowercase, striping extra-whitespace, etc).
+- The n-grams, which is a contiguous sequence of n items from a given sequence of text or speech are created (Trigram, Bigram, and Unigram)
+- Term-document matrix (TDM) was created, which is a matrix of words or phrases and their frequencies in a corpus
+- And the, saved as R-Compressed files(ngrams.RData)
+
+
+
+Building Prediction Model
+========================================================
+
+<span style="font-weight:bold; color:blue"> This prediction model is based on Katz Back-off algorithm. This algorithm matches a phrase to the most frequent n-1 term in a TDM of n-word terms and then returns the nth word.
+
+- For the prediction of the next word, the highest n-gram for this algorithm is a trigram.
+- If trigram is not found, back off to bigram and then to unigram
+- When no key is found in unigram, the word "will" will be returned.
+
+
+Shiny Application and Source codes
+========================================================
+
+I've posted the application using Shiny app UI. The URL for Shiny app and GitHub for source codes is as below:
+
+<span style="color:blue; font-weight:bold"> Shiny app:
+[https://hswon87.shinyapps.io/word-prediction/](https://hswon87.shinyapps.io/word-prediction/)
+
+<span style="color:blue; font-weight:bold"> GitHub:
+[https://github.com/hswon87/course10-final](https://github.com/hswon87/course10-final)

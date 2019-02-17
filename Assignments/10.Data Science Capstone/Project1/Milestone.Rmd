@@ -1,0 +1,191 @@
+---
+title: "Data Sciece Capstone - Milestone Report"
+author: "Sangwon Han"
+date: "Jan 11, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+The goal of this project is to: 
+
+1. Demonstrate that you've downloaded the data and have successfully loaded it in.
+2. Create a basic report of summary statistics about the data sets.
+3. Report any interesting findings that you amassed so far.
+4. Get feedback on your plans for creating a prediction algorithm and Shiny app.
+
+
+# Download and load data
+```{r, cache = TRUE}
+# Download 
+download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", destfile ="Coursera-SwiftKey.zip")
+```
+
+```{r, cache = TRUE}
+# Unzip
+unzip("./Coursera-SwiftKey.zip")
+```
+
+Check local setting and change it.
+```{r, cache = TRUE}
+Sys.getlocale()
+```
+
+```{r, cache = TRUE}
+Sys.setlocale('LC_ALL','C')
+```
+
+```{r, cache = TRUE}
+# Load data for english languge into R
+blogs <- readLines(con <- file("./final/en_US/en_US.blogs.txt"), encoding = "UTF-8", skipNul = TRUE)
+news <- readLines(con <- file("./final/en_US/en_US.news.txt"), encoding = "UTF-8", skipNul = TRUE)
+twitter <- readLines(con <- file("./final/en_US/en_US.twitter.txt"), encoding = "UTF-8", skipNul = TRUE)
+```
+
+However, with warning message news dataset was not loaded properly. Let's compare the size of loaded file and original file
+```{r, cache = TRUE}
+# Size of original file
+news.size <- file.info("./final/en_US/en_US.news.txt")$size / (1024^2)
+news.size
+```
+
+```{r, cache = TRUE}
+# Size of loaded file
+news.size1 <- sum(nchar(news, "bytes")) / (1024^2)
+news.size1
+```
+
+The news dataset is reloaded by opening connection in binary mode. Check the size of loaded file again.
+```{r, cache = TRUE}
+# reload file
+news2 <- readLines(con <- file("./final/en_US/en_US.news.txt", open = "rb"), encoding = "UTF-8", skipNul = TRUE)
+news.size2 <- sum(nchar(news2, "bytes")) / (1024^2)
+news.size2
+```
+
+# Summary statistics
+
+```{r, cache = TRUE}
+# Size in megabytes
+blogs.size <- file.info("./final/en_US/en_US.blogs.txt")$size / (1024^2)
+twitter.size <- file.info("./final/en_US/en_US.twitter.txt")$size / (1024^2)
+```
+
+```{r, cache = TRUE}
+# Line counts
+blogs.line <- length(blogs)
+news.line <- length(news2)
+twitter.line <- length(twitter)
+```
+
+```{r, cache = TRUE}
+# Word counts
+suppressMessages(library(stringi))
+blogs.words <- sum(stri_count_words(blogs))
+news.words <- sum(stri_count_words(news2))
+twitter.words <- sum(stri_count_words(twitter))
+```
+
+```{r, cache = TRUE}
+# Summary data
+data.frame(type = c("blogs", "news", "twitter"), megabytes = c(blogs.size, news.size, twitter.size), lines = c(blogs.line, news.line, twitter.line), words = c(blogs.words, news.words, twitter.words))
+```
+
+```{r, cache = TRUE}
+cup <- c(blogs, news)
+str(cup)
+```
+
+
+# Cleaning data
+
+I will randomly sample 1% of data from blog dataset for the exploratory analysis
+```{r, cache = TRUE}
+# Sample data
+suppressMessages(library(tm))
+suppressMessages(library(stringr))
+set.seed(12345)
+blogs.sample <- sample(blogs, blogs.line * 0.01)
+
+# Create volatile corpus 
+corpus <- VCorpus(VectorSource(blogs.sample), readerControl = list(reader = readPlain, language = "en"))
+
+# Clean data (Remove invalid character)
+toSpace <- content_transformer(function(x, pattern) gsub(pattern, " ", x))
+corpus <- tm_map(corpus, toSpace, "(f|ht)tp(s?)://(.*)[.][a-z]+") # remove URL
+corpus <- tm_map(corpus, toSpace, "@[^\\s]+")
+corpus <- tm_map(corpus, stripWhitespace) # Multiple space to single space
+corpus <- tm_map(corpus, tolower) # Uppercase to lowercase
+corpus <- tm_map(corpus, removeNumbers) # Remove number
+corpus <- tm_map(corpus, removeWords, stopwords("en"))
+corpus <- tm_map(corpus, removePunctuation) # Remove punctuation such as .,;:
+corpus <- tm_map(corpus, PlainTextDocument)
+```
+
+
+# Exploratory analysis
+
+Find the top 10 mostly used words in the dataset.
+First of all, formulate functions to extract word counts for unigram, bigram, and trigram and to make a plot.
+
+```{r, cache = TRUE}
+suppressMessages(library(RWeka))
+options(mc.cores = 1) # Do not use multicore
+
+getCounts <- function(tdm){
+        count <- sort(rowSums(as.matrix(tdm)), decreasing = TRUE)
+        return(data.frame(word = names(count), count = count))
+}
+
+bigram <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+trigram <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+
+
+suppressMessages(library(ggplot2))
+makePlot <- function(x, label, barcolor){
+        ggplot(x[1:10,], aes(reorder(word, -count), count)) + 
+                geom_bar(stat = "identity", fill = barcolor) +
+                xlab(label) + theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+                ylab("Word counts")
+}
+```
+
+check memory limits and expand it
+```{r, cache = TRUE}
+memory.limit()
+```
+```{r, cache = TRUE}
+memory.limit(size = 8048*5)
+```
+
+```{r, cache = TRUE}
+count_uni <- getCounts(removeSparseTerms(TermDocumentMatrix(corpus), 0.9999))
+count_bi <- getCounts(removeSparseTerms(TermDocumentMatrix(corpus, control = list(tokenize = bigram)), 0.9999))
+count_tri <- getCounts(removeSparseTerms(TermDocumentMatrix(corpus, control = list(tokenize = trigram)), 0.9999))
+```
+
+
+Here, I plot a histogram showing top 10 unigrams, bigrams and trigrams for blog dataset.
+```{r, cache = TRUE}
+makePlot(count_uni, "Top 10 Unigrams for blogs", barcolor = "blue")
+```
+
+```{r, cache = TRUE}
+makePlot(count_bi, "Top 10 Bigrams for blogs", barcolor = "green")
+```
+
+```{r, cache = TRUE}
+makePlot(count_tri, "Top 10 Trigrams for blogs", barcolor = "red")
+```
+
+
+# Next steps on your plans for creating a prediction algorithm and Shiny app
+
+The next steps of this project is to make a predictive algorithm and presents interactive programs in a Shiny app.
+The possible predictive algorithm is to predict the following words according to the trigram. Bigram and unigram models will be engaged when trigram model fails to predict the following word.
+
+The Shiny app will present a interactive user App having a text input box. If user enter a phrase, this App will return the next word which is most likely to be appeared. 

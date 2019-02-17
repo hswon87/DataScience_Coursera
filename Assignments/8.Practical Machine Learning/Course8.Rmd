@@ -1,0 +1,190 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Sangwon Han"
+date: "4 Jan 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different way
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+# Data loading
+
+Download and explore the data.
+
+```{r, cache = TRUE}
+setwd("/Users/Han S/Documents/Course8")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "testing.csv")
+train <- read.csv("training.csv", na.strings=c("", "NA", "NULL", "#DIV/0!"))
+test <- read.csv("testing.csv", na.strings=c("", "NA", "NULL", "#DIV/0!"))
+```
+```{r, cache = TRUE }
+dim(train)
+```
+
+```{r, cache = TRUE}
+str(test)
+```
+
+```{r, cache = TRUE }
+dim(test)
+```
+ 
+
+# Pre-processing data
+
+1. Cleansing data
+
+Remove NA values
+```{r, cache = TRUE}
+train_dena <- train[, colSums(is.na(train)) == 0]
+dim(train_dena)
+```
+
+Then, remove 1st to 7th colums since they are unlikely to be related to dependent variable
+```{r, cache = TRUE}
+train_clean <- train_dena[, 8:60]
+dim(train_clean)
+```
+
+Remove the variables that have near zero variance (only numeric variables were evaluated)
+```{r, cache = TRUE}
+suppressMessages(library(caret))
+zeroVar = nearZeroVar(train_clean[sapply(train_clean, is.numeric)], saveMetrics = TRUE)
+train_nzv = train_clean[, zeroVar[, "nzv"] == FALSE]
+```
+
+Remove highly correlated variables with a cut-off value of 90% (only numeric variables were evaluated).
+```{r, cach = TRUE}
+suppressMessages(library(caret))
+corrMatrix <- cor(na.omit(train_nzv[sapply(train_nzv, is.numeric)]))
+removecor <- findCorrelation(corrMatrix, cutoff = 0.90, verbose = FALSE)
+train_decor <- train_nzv[, -removecor]
+dim(train_decor)
+```
+
+
+2. Split data for cross validation
+```{r, cach = TRUE}
+set.seed(12345)
+inTrain <- createDataPartition(y = train_decor$classe, p = 0.7, list = FALSE)
+training <- train_decor[inTrain, ]; testing <- train_decor[-inTrain, ]
+dim(training); dim(testing)
+```
+
+
+# Decision tree model
+
+1-1. Building the decision tree model with caret package
+```{r, cache = TRUE}
+set.seed(12345)
+modFit <- train(classe ~ ., method = "rpart", data = training)
+```
+
+1-2. Building the decision tree model with tree package
+```{r, cache = TRUE}
+suppressMessages(library(tree))
+set.seed(12345)
+modFit_tree <- tree(classe ~ ., data = training)
+```
+
+##Fig1. Tree plot - caret
+```{r, cache = TRUE}
+suppressMessages(library(rattle))
+fancyRpartPlot(modFit$finalModel)
+```
+
+##Fig2. Tree plot - tree
+```{r, cache = TRUE}
+plot(modFit_tree)
+text(modFit_tree, cex = 0.8, pretty = 0)
+```
+
+
+2-1. Predicting with the decision tree model (caret)
+```{r, cache = TRUE}
+prediction <- predict(modFit, newdata = testing)
+confusionMatrix(prediction, testing$classe)
+```
+
+2-2. Predicting with the decision tree model (tree)
+```{r, cache = TRUE}
+prediction_tree <- predict(modFit_tree, testing, type = "class")
+confusionMatrix(prediction_tree, testing$classe)
+```
+The model using "tree" package showed a higher accuracy
+
+3. Pruning trees by cross validation
+```{r, cache = TRUE}
+cv.trees <- cv.tree(modFit_tree, FUN = prune.misclass)
+plot(cv.trees, xlim = c(0, 30))
+```
+
+Therefore, pruning is not necessary. However, for the practical purpose, prune at the size of nodes of 10
+```{r, cache = TRUE}
+modFit_tree_prune = prune.misclass(modFit_tree, best = 10)
+plot(modFit_tree_prune)
+text(modFit_tree_prune, cex = 0.8, pretty = 0)
+```
+
+
+# Random Forest Model
+
+```{r, cache = TRUE}
+suppressMessages(library(randomForest))
+set.seed(12345)
+modFit_rf <- randomForest(classe ~ ., data = training, method = "rf")
+prediction_rf <- predict(modFit_rf, newdata = testing, type = "class")
+confusionMatrix(prediction_rf, testing$classe)
+```
+
+```{r, cache = TRUE}
+plot(modFit_rf)
+```
+
+See which variables are important.
+```{r, cache = TRUE}
+varImpPlot(modFit_rf)
+```
+
+
+
+# Boosting Model
+```{r, cache = TRUE}
+set.seed(12345)
+modFit_boost <- train(classe ~ ., data = training, method = "gbm", verbose = FALSE)
+```
+
+See relative influence of each predictor
+```{r, cache = TRUE}
+summary(modFit_boost)
+```
+
+```{r, cache = TRUE}
+prediction_boost <- predict(modFit_boost, newdata = testing)
+confusionMatrix(prediction_boost, testing$classe)
+```
+
+
+The random forest modeling showed the highest accuracy. Therefore, choose it for the Quiz!
+
+
+# Course Project Prediction Quiz
+```{r, cache = TRUE}
+quiz <- predict(modFit_rf, newdata = test, type = "class")
+head(quiz, 20)
+```
+

@@ -1,0 +1,24 @@
+---
+title: "Developing Data Products - Week 3 Assignment"
+author: "Sangwon Han"
+date: "Jan 3, 2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Overview
+
+This assignment is to create a web page presentation using R Markdown that features a plot created with Plotly. 
+I plot a scatterplot with mtcars dataset
+```{r, echo=FALSE}
+suppressMessages(library(plotly))
+```
+
+## Scatterplot
+```{r, echo=FALSE}
+plot_ly(data = mtcars, x = ~wt, y = ~mpg, type = "scatter", color = ~as.factor(cyl))
+```
+

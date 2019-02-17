@@ -1,0 +1,101 @@
+---
+title: "Regression Models Course Project"
+author: "Sangwon Han"
+date: '2018-12-27'
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Executive Summary
+In this project, I explore the relationship between a set of variables and miles per gallon (MPG) (outcome). I am particularly interested in the following two questions:
+
+1. Is an automatic or manual transmission better for MPG?
+2. Quantify the MPG difference between automatic and manual transmissions
+
+
+
+# Exploratory analysis
+
+Load data, and look at it. Supplemental figure (A1 on Appendix) shows scatter plots of data
+```{r, cache=TRUE}
+data(mtcars)
+str(mtcars)
+```
+
+
+Transform the numeric variables into factor variables
+```{r, cache = TRUE}
+mtcars$cyl  <- factor(mtcars$cyl)
+mtcars$vs   <- factor(mtcars$vs)
+mtcars$am   <- factor(mtcars$am,labels=c("automatic","manual"))
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+```
+
+
+Initially, we compare tha mpg values between automatic and manual groups by means of linear regression with dummy variable. 
+```{r, cache = TRUE}
+lm_am <- lm(mpg ~ am, data = mtcars)
+summary(lm_am)
+```
+
+The results showed that average MPG for automatic group is 17.147, while manual group has a mean value of 7.245 higher than automatic group (Box and whisker plot of mpg vs transmission is available in A2 of Appendix section). The difference is statistically significant (p = 0.000285)
+
+However, this results did not consider the confounding effect. To deal with confounders, multivariate regression analysis is required.
+
+
+# Regression analysis
+
+At first, I built linear regression models including all different variables. The model selection is based on stepwise selection using both forward selection and backward elimination method.
+```{r, cache = TRUE}
+multi_model <- lm(mpg ~ ., data = mtcars)
+best_multi <- step(multi_model, direction = "both")
+```
+
+
+The best multivariate model (having lowest AIC) consists cyl, hp, wt, and am as predictors. 
+```{r, cache = TRUE}
+summary(best_multi)
+```
+
+The results shows that after adjusting confounders(cyl, hp, and wt), manual group has a mean mpg value of being 1.80921 higher than automatic transmission group, however, the difference is not statistically significant (p = 0.20646)
+
+The adjusted R-squared value of the best multivariate model is 0.84, wherease that of initial single regression model is 0.34. The anova analysis shows that adding cyl, hp, and wt contribute to enhance the model fit significantly.
+```{r, cache= TRUE}
+anova(lm_am, best_multi)
+```
+
+
+# Residual and diagnositics
+
+Make residual plots for the best multivariate model to examine any heteroskedacity or non-normality
+```{r, cache= TRUE}
+par(mfrow = c(2,2))
+plot(best_multi)
+```
+
+No significant heteroskedacity or non-normality was found.
+
+
+# Conclusions
+
+- Cars having manual transmission has a mean miles per gallon of being 7.245 higher than those having automatic transmission.
+
+- However, after considering the influences of horsepower, number of cylinders and weight. group, the difference was decreased into 1.809 and no longer statistically significant
+
+
+## Appendix
+A1. Scatter plot matrix for mtcars dataset
+```{r, cache= TRUE}
+pairs(mpg~., data = mtcars)
+```
+
+A2. Box and whisker plot of mpg vs transmission
+```{r, cache= TRUE}
+plot(mpg ~ am, data = mtcars)
+```

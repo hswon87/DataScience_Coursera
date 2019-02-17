@@ -1,0 +1,106 @@
+---
+title: "Course6-2"
+author: "Sangwon Han"
+date: "2018-12-18"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+In the second portion of the project, we're going to analyze the ToothGrowth data in the R datasets package.
+
+
+#1. Load the ToothGrowth data and explore data analyses
+
+```{r, cache=TRUE}
+data(ToothGrowth)
+str(ToothGrowth)
+```
+
+```{r, cache=TRUE}
+head(ToothGrowth)
+```
+
+```{r, cache=TRUE}
+unique(ToothGrowth$dose)
+```
+
+#2. Provide a basic summary of the data.
+```{r, cache=TRUE}
+summary(ToothGrowth)
+```
+
+Plot box and whisker diagram
+```{r, cache=TRUE}
+par(mfrow = c(1,2))
+plot(len ~ as.factor(dose), data = ToothGrowth, xlab = "Dose (mg/day)", ylab = "Tooth length")
+plot(len ~ supp, data = ToothGrowth, xlab = "Supplement", ylab = "Tooth length")
+```
+
+
+Plot box and whisker diagram according to supplement type subgroups
+```{r, cache=TRUE}
+par(mfrow = c(1,2))
+plot(len[ToothGrowth$supp == "OJ"] ~ as.factor(dose[ToothGrowth$supp == "OJ"]), data = ToothGrowth, xlab = "Dose (mg/day)", ylab = "Tooth length", main = "OJ", ylim = c(5,35))
+plot(len[ToothGrowth$supp == "VC"] ~ as.factor(dose[ToothGrowth$supp == "OJ"]), data = ToothGrowth, xlab = "Dose (mg/day)", ylab = "Tooth length", main = "VC")
+```
+
+
+Plot box and whisker diagram according to dose subgroups
+```{r, cache=TRUE}
+par(mfrow = c(1,3))
+plot(len[ToothGrowth$dose == 0.5] ~ supp[ToothGrowth$dose == 0.5], data = ToothGrowth, xlab = "Supplement", ylab = "Tooth length", main = "0.5 mg/day", ylim = c(5, 35))
+plot(len[ToothGrowth$dose == 1.0] ~ supp[ToothGrowth$dose == 1.0], data = ToothGrowth, xlab = "Supplement", ylab = "Tooth length", main = "1.0 mg/day", ylim = c(5, 35))
+plot(len[ToothGrowth$dose == 2.0] ~ supp[ToothGrowth$dose == 2.0], data = ToothGrowth, xlab = "Supplement", ylab = "Tooth length", main = "2.0 mg/day", ylim = c(5, 35))
+```
+
+#3. Hypothesis tests to compare tooth growth by supp and dose.
+
+##3-1. Supplement
+
+See whether the test meets equal variance assumption
+```{r, cache=TRUE}
+var.test(len~supp, data = ToothGrowth)
+```
+No significant difference in variance are shown.
+
+Perform t.test function to compare two supplement groups
+```{r, cache=TRUE}
+t.test(len~supp, data = ToothGrowth, paired = FALSE, var.equal = TRUE)
+```
+
+
+
+##3-2. Dose
+
+See whether the test meets equal variance assumption
+```{r, cache=TRUE}
+bartlett.test(len~as.factor(dose), data = ToothGrowth)
+```
+No significant difference in variance are shown.
+
+
+Perform aov function to compare three dose groups
+```{r, cache=TRUE}
+ANOVA <- aov(len~as.factor(dose), data = ToothGrowth)
+summary(ANOVA)
+```
+
+Then, which group shows significant difference in tooth length?
+```{r, cache=TRUE}
+TukeyHSD(ANOVA)
+```
+
+#4. conclusions
+
+As shown above, we can conclude 
+
+1. Tooth length does not differ according to supplement delivery type.
+2. Tooth length does differ among the three dose levels of vitamin C.
+

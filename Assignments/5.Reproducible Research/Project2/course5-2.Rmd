@@ -1,0 +1,202 @@
+---
+title: "Reproducible Research Project 2"
+author: "Sangwon Han"
+date: "2018<eb>ÖÑ 12<ec>õî 27<ec>ùº"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+#Synopsis
+The basic goal of this project is to explore the NOAA Storm Database and answer some basic questions about severe weather events. 
+The data analysis is for addressing the following questions:
+
+1. Across the United States, which types of events are most harmful with respect to population health?
+
+2. Across the United States, which types of events have the greatest economic consequences?
+
+#Read and preprocess data
+##Set working directory and read the data
+```{r, cache=TRUE, results=FALSE}
+getwd()
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(url, "StormData.csv.bz2")
+df <- read.csv("StormData.csv.bz2", header=TRUE, sep=",")
+```
+
+##Explore and clean data
+```{r, cache=TRUE}
+str(df)
+```
+
+```{r, cache=TRUE}
+head(df)
+```
+
+```{r, cache=TRUE}
+tail(df)
+```
+There must be an error in the dataset, so find the location of the source of error in "STATE" colunm (having 2 character, normally)
+```{r, cache=TRUE}
+sum(nchar(as.character(df$STATE)[1:570290])==2)
+```
+Something wrong in 547364th row
+```{r, cache=TRUE}
+View(df[547363:547365,])
+```
+The problem exist in [END_RANGE] in 547364th row. 
+```{r, cache=TRUE}
+df$END_RANGE[547364]
+```
+Load data using [readLines] function, again. (The quote mark is &#92;")
+```{r, cache=TRUE}
+df1 <- readLines(con="StormData.csv.bz2")
+df1[1:2]
+```
+Find the line having problem
+```{r, cache=TRUE}
+grep("547303.00", df1)
+```
+
+```{r, cache=TRUE}
+df1[884718]
+```
+The problem is [&#92;"] in the sentences. Therefore, let's remove it
+```{r, cache=TRUE}
+tmp1 = gsub("\"\" ","", df1)
+writeLines(tmp1, "StormData1.txt")
+df_edited <- read.table("StormData1.txt", sep=",", quote = "\"", header = T)
+dim(df_edited)
+```
+
+
+#Process data 
+
+##Extract variables for health and economic data
+```{r, cache=TRUE}
+health <- c("EVTYPE", "FATALITIES", "INJURIES")
+healthData <- df_edited[,health]
+economic <- c("EVTYPE", "CROPDMG", "CROPDMGEXP", "PROPDMG", "PROPDMGEXP")
+economicData <- df_edited[,economic]
+```
+
+##Process health data
+```{r, cache=TRUE}
+str(healthData)
+```
+
+```{r, cache=TRUE}
+health_event <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, data=healthData, FUN=sum, na.rm = TRUE)
+health_event$TOTAL <- health_event$FATALITIES + health_event$INJURIES
+```
+arrange data in descending order, extract top 10 events, and use [melt] function for grouped bar chart 
+```{r, cache=TRUE}
+library(dplyr)
+health_event <- arrange(health_event, desc(TOTAL))
+top10_health <- health_event[1:10, ]
+top10_health
+```
+
+```{r, cache=TRUE}
+library(reshape2)
+top10_health_melt <- melt(top10_health, id.vars = "EVTYPE")
+```
+
+
+
+
+#Draw bar chart for health impact
+```{r, cache=TRUE}
+library(ggplot2)
+fig_health <- ggplot(top10_health_melt, aes(x = reorder(EVTYPE, -value), y = value)) +
+                geom_bar(stat = "identity", aes(fill = variable), position = "dodge") +
+                xlab("Events") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+                ylab("Total counts") + 
+                ggtitle("Top 10 weather events for health effect")
+fig_health
+```
+
+[TORNADO] is the most harmful with respect to population health!!
+
+
+
+
+## Process economic data
+
+```{r, cache=TRUE}
+table(economicData$CROPDMGEXP)
+```
+
+```{r, cache=TRUE}
+table(economicData$PROPDMGEXP)
+```
+
+```{r, cache=TRUE}
+str(economicData$CROPDMGEXP)
+```
+
+change character into numeric values in [CROPDMGEXP] and [PROPDMGEXP] columns. At first, I made a function 
+```{r, cache=TRUE}
+trans <- function(x){
+        if(x=="?"|x=="-"|x=="+"|x==""){
+                x <- 1
+        }else if(x=="h"|x=="H"){
+                x <- 10^2
+        }else if(x=="k"|x=="K"){
+                x <- 10^3
+        }else if(x=="m"|x=="M"){
+                x <- 10^6
+        }else if(x=="b"|x=="B"){
+                x <- 10^9
+        }else{
+                x <- 10^(as.numeric(x))
+        }
+}
+```
+Transform the values
+```{r, cache=TRUE}
+economicData$CROPDMGEXP_trans <- sapply(as.character(economicData$CROPDMGEXP), trans)
+table(economicData$CROPDMGEXP_trans)
+```
+
+```{r, cache=TRUE}
+economicData$PROPDMGEXP_trans <- sapply(as.character(economicData$PROPDMGEXP), trans)
+table(economicData$PROPDMGEXP_trans)
+```
+
+calculate the sum of the values
+```{r, cache=TRUE}
+economicData$CROP_total <- economicData$CROPDMGEXP_trans * economicData$CROPDMG
+economicData$PROP_total <- economicData$PROPDMGEXP_trans * economicData$PROPDMG
+```
+
+I calculate the sum of each value according to the type of events.
+Then, arrange data in descending order, extract top 10 events, and use [melt] function for grouped bar chart
+```{r, cache=TRUE}
+economic_event <- aggregate(cbind(CROP_total, PROP_total) ~ EVTYPE, data = economicData, FUN=sum, na.rm = TRUE)
+economic_event$SUM <- economic_event$CROP_total + economic_event$PROP_total
+economic_event <- arrange(economic_event, desc(SUM))
+top10_economic <- economic_event[1:10, ]
+top10_economic
+```
+
+```{r, cache=TRUE}
+colnames(top10_economic) <- c("EVTYPE", "CROP", "PROPERTY", "TOTAL")
+top10_economic_melt <- melt(top10_economic, id.vars = "EVTYPE")
+```
+
+
+
+
+#Draw bar chart for Economic impact
+```{r, cache=TRUE}
+fig_economic <- ggplot(top10_economic_melt, aes(x = reorder(EVTYPE, -value), y = value)) +
+        geom_bar(stat = "identity", aes(fill = variable), position = "dodge") +
+        xlab("Events") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        ylab("Total counts") + 
+        ggtitle("Top 10 weather events for economic effect")
+fig_economic
+```
+
+
+Therefore, [FLOOD] is the event having the greatest economic consequence!!
